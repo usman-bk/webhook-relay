@@ -191,6 +191,7 @@ async def finish(
     duration_ms: int,
     retry_in: float | None,
     disable_after: int,
+    disable_window: float,
 ) -> bool:
     """Record the result. `retry_in` None means give up. Returns False when this
     worker no longer owns the delivery, in which case nothing is written."""
@@ -229,7 +230,10 @@ async def finish(
             return False
         if ok:
             await conn.execute(
-                text("UPDATE endpoints SET consecutive_failures = 0 WHERE id = :e"),
+                text(
+                    "UPDATE endpoints SET consecutive_failures = 0, failing_since = NULL "
+                    "WHERE id = :e"
+                ),
                 {"e": job.endpoint_id},
             )
         else:
@@ -238,12 +242,15 @@ async def finish(
                     """
                     UPDATE endpoints
                     SET consecutive_failures = consecutive_failures + 1,
+                        failing_since = coalesce(failing_since, now()),
                         disabled_at = CASE WHEN consecutive_failures + 1 >= :n
-                            AND disabled_at IS NULL THEN now() ELSE disabled_at END
+                            AND disabled_at IS NULL
+                            AND now() - coalesce(failing_since, now()) >= make_interval(secs => :w)
+                            THEN now() ELSE disabled_at END
                     WHERE id = :e
                     """
                 ),
-                {"e": job.endpoint_id, "n": disable_after},
+                {"e": job.endpoint_id, "n": disable_after, "w": disable_window},
             )
     return True
 

@@ -52,6 +52,7 @@ def settings() -> Settings:
         poll_interval=0.02,
         batch_size=10,
         disable_after=3,
+        disable_window=0.0,
     )
 
 

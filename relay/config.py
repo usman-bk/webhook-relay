@@ -29,6 +29,9 @@ class Settings:
     batch_size: int = 10
     # Endpoints
     disable_after: int = _env("RELAY_DISABLE_AFTER", 5, int)
+    # Failures must also span this many seconds, so a blip cannot disable an
+    # endpoint that has a backlog.
+    disable_window: float = _env("RELAY_DISABLE_WINDOW", 600.0)
     # Comma separated CIDRs that may be called although they are not public,
     # for receivers on a private network. Empty by default.
     allow_networks: str = field(default_factory=lambda: os.environ.get("RELAY_ALLOW_NETWORKS", ""))

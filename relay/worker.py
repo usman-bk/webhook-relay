@@ -73,6 +73,7 @@ class Worker:
             duration_ms=out.duration_ms,
             retry_in=retry_in,
             disable_after=s.disable_after,
+            disable_window=s.disable_window,
         )
         if not wrote:
             log.warning("delivery %s attempt %s lost its lease", job.id, job.attempts)

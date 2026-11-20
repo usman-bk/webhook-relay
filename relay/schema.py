@@ -10,9 +10,11 @@ DDL = [
         ordered boolean NOT NULL DEFAULT false,
         consecutive_failures integer NOT NULL DEFAULT 0,
         disabled_at timestamptz,
+        failing_since timestamptz,
         created_at timestamptz NOT NULL DEFAULT now()
     )
     """,
+    "ALTER TABLE endpoints ADD COLUMN IF NOT EXISTS failing_since timestamptz",
     """
     CREATE TABLE IF NOT EXISTS deliveries (
         id bigserial PRIMARY KEY,
