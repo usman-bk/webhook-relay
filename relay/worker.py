@@ -14,7 +14,7 @@ from . import signing, store
 from .backoff import delay_for
 from .config import Settings
 from .sender import send
-from .ssrf import Policy
+from .ssrf import Policy, networks_from
 
 log = logging.getLogger("relay.worker")
 
@@ -93,7 +93,7 @@ async def main() -> None:
     logging.basicConfig(level=logging.INFO)
     settings = Settings()
     engine = create_async_engine(settings.database_url, pool_size=10)
-    worker = Worker(engine, settings)
+    worker = Worker(engine, settings, Policy(allow_networks=networks_from(settings.allow_networks)))
     try:
         await worker.run_forever()
     finally:

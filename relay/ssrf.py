@@ -39,6 +39,10 @@ async def system_resolver(host: str, port: int) -> list[str]:
     return seen
 
 
+def networks_from(text: str) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
+    return [ipaddress.ip_network(p.strip()) for p in text.split(",") if p.strip()]
+
+
 @dataclass
 class Policy:
     resolver: Resolver = system_resolver

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from . import store
 from .config import Settings
 from .schema import init_db
-from .ssrf import Policy, UnsafeTarget, check_url
+from .ssrf import Policy, UnsafeTarget, check_url, networks_from
 
 
 class EndpointIn(BaseModel):
@@ -27,7 +27,7 @@ class EventIn(BaseModel):
 
 def create_app(settings: Settings | None = None, policy: Policy | None = None) -> FastAPI:
     settings = settings or Settings()
-    policy = policy or Policy()
+    policy = policy or Policy(allow_networks=networks_from(settings.allow_networks))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):

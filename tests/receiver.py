@@ -99,6 +99,9 @@ class Receiver:
                 self.end_headers()
                 self.wfile.write(b"ok")
 
+        # The default listen backlog is 5, which turns 50 simultaneous workers
+        # into connection errors that are the test server's fault.
+        ThreadingHTTPServer.request_queue_size = 256
         self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
         self.server.daemon_threads = True
         self.port = self.server.server_address[1]
