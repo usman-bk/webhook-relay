@@ -224,7 +224,8 @@ async def test_unordered_endpoint_does_not_block_behind_a_failure(
         await worker.run_once()
         await asyncio.sleep(0.05)
     statuses = [await status_of(engine, i) for i in ids]
-    assert statuses == ["pending", "succeeded", "succeeded"]
+    # Which of the three gets the 500 depends on arrival order, so count them.
+    assert sorted(statuses) == ["pending", "succeeded", "succeeded"]
 
 
 async def test_worker_survives_a_restart_between_attempts(engine, endpoint, receiver, settings):
