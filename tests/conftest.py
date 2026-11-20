@@ -19,7 +19,7 @@ from relay.worker import Worker
 from .receiver import Receiver
 
 TEST_DB = os.environ.get(
-    "TEST_DATABASE_URL", "postgresql+asyncpg://Hamid@localhost:5432/webhook_relay_test"
+    "TEST_DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/webhook_relay_test"
 )
 
 
