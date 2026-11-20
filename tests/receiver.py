@@ -8,6 +8,7 @@ Each incoming request takes the next entry from `script`, then falls back to
     ("drop",)                   close the socket without answering
     ("drip", seconds)           send 200 and a body one byte at a time
     ("redirect", code, url)     answer with a redirect
+    ("big", megabytes)          answer with a very large body
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ class Receiver:
     script: list = field(default_factory=list)
     default: tuple = ("status", 200)
     seen: list[Seen] = field(default_factory=list)
+    bytes_sent: int = 0
     _lock: threading.Lock = field(default_factory=threading.Lock)
 
     def start(self) -> Receiver:
@@ -74,6 +76,15 @@ class Receiver:
                             self.wfile.write(b"x")
                             self.wfile.flush()
                             time.sleep(0.1)
+                    elif kind == "big":
+                        total = step[1] * 1024 * 1024
+                        self.send_response(200)
+                        self.send_header("Content-Length", str(total))
+                        self.end_headers()
+                        chunk = b"x" * 65536
+                        for _ in range(total // len(chunk)):
+                            self.wfile.write(chunk)
+                            outer.bytes_sent += len(chunk)
                     elif kind == "redirect":
                         self.send_response(step[1])
                         self.send_header("Location", step[2])

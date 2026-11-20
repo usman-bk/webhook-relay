@@ -80,23 +80,38 @@ async def enable_endpoint(engine: AsyncEngine, endpoint_id: str) -> bool:
 
 async def enqueue(engine: AsyncEngine, endpoint_id: str, event_type: str, body: str) -> int | None:
     async with engine.begin() as conn:
-        secret = (
-            await conn.execute(
-                text("SELECT secret FROM endpoints WHERE id = :id"), {"id": endpoint_id}
-            )
-        ).scalar()
-        if secret is None:
-            return None
-        header = signing.sign(secret, body.encode())
-        return (
-            await conn.execute(
-                text(
-                    "INSERT INTO deliveries (endpoint_id, event_type, body, signature) "
-                    "VALUES (:e, :t, :b, :s) RETURNING id"
-                ),
-                {"e": endpoint_id, "t": event_type, "b": body, "s": header},
-            )
-        ).scalar_one()
+        return await enqueue_in(conn, endpoint_id, event_type, body)
+
+
+async def enqueue_in(
+    conn: AsyncConnection, endpoint_id: str, event_type: str, body: str
+) -> int | None:
+    row = (
+        await conn.execute(
+            text("SELECT secret, ordered FROM endpoints WHERE id = :id"), {"id": endpoint_id}
+        )
+    ).first()
+    if row is None:
+        return None
+    secret, ordered = row
+    if ordered:
+        # Ids come from a sequence, commit order is another thing. Without this
+        # lock a request that took id 5 can commit after the one with id 6, and
+        # the worker would send 6 first. Holding the lock until commit makes the
+        # id order and the commit order the same order.
+        await conn.execute(
+            text("SELECT pg_advisory_xact_lock(hashtextextended(:id, 0))"), {"id": endpoint_id}
+        )
+    header = signing.sign(secret, body.encode())
+    return (
+        await conn.execute(
+            text(
+                "INSERT INTO deliveries (endpoint_id, event_type, body, signature) "
+                "VALUES (:e, :t, :b, :s) RETURNING id"
+            ),
+            {"e": endpoint_id, "t": event_type, "b": body, "s": header},
+        )
+    ).scalar_one()
 
 
 CLAIM = text(

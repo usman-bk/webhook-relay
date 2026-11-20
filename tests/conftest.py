@@ -108,3 +108,13 @@ async def status_of(engine, delivery_id: int) -> str:
 @pytest_asyncio.fixture
 async def endpoint(engine, receiver):
     return await store.create_endpoint(engine, receiver.url, ordered=False)
+
+
+async def drain(worker, engine, ids, timeout: float = 10.0):
+    """Run the worker until every delivery in ids has succeeded."""
+
+    async def done():
+        await worker.run_once()
+        return all([await status_of(engine, i) == "succeeded" for i in ids])
+
+    await wait_for(done, timeout)
