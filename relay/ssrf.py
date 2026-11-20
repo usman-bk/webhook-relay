@@ -44,7 +44,9 @@ class Policy:
     resolver: Resolver = system_resolver
     # Networks that are allowed even though they are not public. Empty in
     # production. The tests allow 127.0.0.1/32 so a local receiver can be reached.
-    allow_networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = field(default_factory=list)
+    allow_networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = field(
+        default_factory=list
+    )
     allowed_schemes: tuple[str, ...] = ("http", "https")
 
     def address_ok(self, ip: IP) -> bool:
