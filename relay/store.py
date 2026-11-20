@@ -9,8 +9,6 @@ from typing import Any
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
 
-from . import signing
-
 
 @dataclass
 class Claimed:
@@ -19,7 +17,6 @@ class Claimed:
     url: str
     secret: str
     body: str
-    signature: str
     event_type: str
     attempts: int
 
@@ -86,14 +83,13 @@ async def enqueue(engine: AsyncEngine, endpoint_id: str, event_type: str, body: 
 async def enqueue_in(
     conn: AsyncConnection, endpoint_id: str, event_type: str, body: str
 ) -> int | None:
-    row = (
+    ordered = (
         await conn.execute(
-            text("SELECT secret, ordered FROM endpoints WHERE id = :id"), {"id": endpoint_id}
+            text("SELECT ordered FROM endpoints WHERE id = :id"), {"id": endpoint_id}
         )
-    ).first()
-    if row is None:
+    ).scalar()
+    if ordered is None:
         return None
-    secret, ordered = row
     if ordered:
         # Ids come from a sequence, commit order is another thing. Without this
         # lock a request that took id 5 can commit after the one with id 6, and
@@ -102,14 +98,13 @@ async def enqueue_in(
         await conn.execute(
             text("SELECT pg_advisory_xact_lock(hashtextextended(:id, 0))"), {"id": endpoint_id}
         )
-    header = signing.sign(secret, body.encode())
     return (
         await conn.execute(
             text(
-                "INSERT INTO deliveries (endpoint_id, event_type, body, signature) "
-                "VALUES (:e, :t, :b, :s) RETURNING id"
+                "INSERT INTO deliveries (endpoint_id, event_type, body) "
+                "VALUES (:e, :t, :b) RETURNING id"
             ),
-            {"e": endpoint_id, "t": event_type, "b": body, "s": header},
+            {"e": endpoint_id, "t": event_type, "b": body},
         )
     ).scalar_one()
 
@@ -137,7 +132,7 @@ CLAIM = text(
         locked_until = now() + make_interval(secs => :lease)
     FROM due, endpoints e
     WHERE d.id = due.id AND e.id = d.endpoint_id
-    RETURNING d.id, d.endpoint_id, e.url, e.secret, d.body, d.signature, d.event_type, d.attempts
+    RETURNING d.id, d.endpoint_id, e.url, e.secret, d.body, d.event_type, d.attempts
     """
 )
 
@@ -145,7 +140,7 @@ CLAIM = text(
 async def claim(engine: AsyncEngine, limit: int, lease_seconds: float) -> list[Claimed]:
     async with engine.begin() as conn:
         rows = (await conn.execute(CLAIM, {"n": limit, "lease": lease_seconds})).all()
-    return [Claimed(r[0], str(r[1]), r[2], r[3], r[4], r[5], r[6], r[7]) for r in rows]
+    return [Claimed(r[0], str(r[1]), r[2], r[3], r[4], r[5], r[6]) for r in rows]
 
 
 async def reap(engine: AsyncEngine, max_attempts: int) -> int:

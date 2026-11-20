@@ -10,7 +10,7 @@ import random
 import httpx
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
-from . import store
+from . import signing, store
 from .backoff import delay_for
 from .config import Settings
 from .sender import send
@@ -49,15 +49,18 @@ class Worker:
 
     async def _deliver(self, job: store.Claimed) -> None:
         s = self.settings
+        body = job.body.encode()
         headers = {
             "Content-Type": "application/json",
             "User-Agent": "webhook-relay/0.1",
             "X-Relay-Delivery-Id": str(job.id),
             "X-Relay-Event": job.event_type,
             "X-Relay-Attempt": str(job.attempts),
-            "X-Relay-Signature": job.signature,
+            # Signed now, not when it was queued: a retry an hour later would
+            # otherwise arrive outside every receiver's tolerance window.
+            "X-Relay-Signature": signing.sign(job.secret, body),
         }
-        out = await send(self.client, self.policy, s, job.url, job.body.encode(), headers)
+        out = await send(self.client, self.policy, s, job.url, body, headers)
         retry_in = None
         if not out.ok and not out.permanent and job.attempts < s.max_attempts:
             retry_in = delay_for(job.attempts, s.backoff_base, s.backoff_cap, self.rng)

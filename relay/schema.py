@@ -19,7 +19,6 @@ DDL = [
         endpoint_id uuid NOT NULL REFERENCES endpoints(id) ON DELETE CASCADE,
         event_type text NOT NULL,
         body text NOT NULL,
-        signature text NOT NULL,
         status text NOT NULL DEFAULT 'pending'
             CHECK (status IN ('pending', 'delivering', 'succeeded', 'dead')),
         attempts integer NOT NULL DEFAULT 0,
